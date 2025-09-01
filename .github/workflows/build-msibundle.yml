@@ -1,0 +1,46 @@
+name: Build Files App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.200
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Ensure Visual Studio components are installed
+        run: |
+          $vsPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise"
+          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          & $installer modify --installPath $vsPath `
+            --add Microsoft.VisualStudio.Component.Windows11SDK.22621 `
+            --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            --add Microsoft.VisualStudio.Component.VC.ATL `
+            --quiet --norestart --nocache
+        shell: pwsh
+
+      - name: Restore NuGet packages
+        run: msbuild Files.slnx /t:Restore
+
+      - name: Build Windows App Package (Debug, x64)
+        run: msbuild "src/Files.App (Package)/Files.Package.wapproj" /p:Configuration=Debug /p:Platform=x64 /t:Publish
+
+      - name: Upload MSIX build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-app-package
+          path: src/Files.App (Package)/AppPackages/
